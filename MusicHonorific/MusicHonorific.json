@@ -9,5 +9,7 @@
   "Tags": ["music", "honorific", "deezer", "spotify"],
   "CategoryTags": ["other"],
   "LoadRequiredState": 0,
+  "DownloadLinkInstall": "https://github.com/kyaEH/MusicHonorific/archive/refs/tags/Beta.zip",
+  "DownloadLinkUpdate": "https://github.com/kyaEH/MusicHonorific/archive/refs/tags/Beta.zip",
   "LoadSync": false
 }
