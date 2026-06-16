@@ -22,7 +22,7 @@
   "LoadPriority": 0,
   "IconUrl": "https://raw.githubusercontent.com/KyaEH/MusicHonorific/master/Data/cat.png",
   "Punchline": "Display your currently playing track as your Honorific title.",
-  "DownloadLinkInstall": "https://github.com/KyaEH/MusicHonorific/releases/download/0.0.0.1/latest.zip",
-  "DownloadLinkUpdate": "https://github.com/KyaEH/MusicHonorific/releases/download/0.0.0.1/latest.zip",
+  "DownloadLinkInstall": "https://github.com/KyaEH/MusicHonorific/releases/download/0.0.0.2/latest.zip",
+  "DownloadLinkUpdate": "https://github.com/KyaEH/MusicHonorific/releases/download/0.0.0.2/latest.zip",
   "AcceptsFeedback": true
 }
