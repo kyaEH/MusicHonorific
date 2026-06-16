@@ -10,4 +10,8 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="AnyAscii" Version="0.3.2" />
+  </ItemGroup>
+
   </Project>

@@ -21,6 +21,9 @@ No external RPC helper is required.
 ## Installation
 
 1. Add the plugin's custom repository to Dalamud (or load it as a dev plugin)
+```
+https://raw.githubusercontent.com/kyaEH/MusicHonorific/master/repo.json
+```
 2. Install **Music Honorific** from the plugin installer
 3. Open the plugin window with `/musichonorific` (or via the plugin list)
 

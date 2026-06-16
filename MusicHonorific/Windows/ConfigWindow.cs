@@ -18,7 +18,7 @@ public class ConfigWindow : Window, IDisposable
         Flags = ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar |
                 ImGuiWindowFlags.NoScrollWithMouse;
 
-        Size = new Vector2(280, 230);
+        Size = new Vector2(300, 300);
         SizeCondition = ImGuiCond.Always;
 
         this.plugin = plugin;
@@ -61,6 +61,23 @@ public class ConfigWindow : Window, IDisposable
         if (ImGui.Checkbox("Other sources (YouTube, browser...)", ref allowOther))
         {
             configuration.AllowOther = allowOther;
+            configuration.Save();
+        }
+
+        ImGui.Separator();
+        ImGui.TextUnformatted("Title colors:");
+
+        var textColor = configuration.TextColor;
+        if (ImGui.ColorEdit3("Text color", ref textColor))
+        {
+            configuration.TextColor = textColor;
+            configuration.Save();
+        }
+
+        var glowColor = configuration.GlowColor;
+        if (ImGui.ColorEdit3("Glow color", ref glowColor))
+        {
+            configuration.GlowColor = glowColor;
             configuration.Save();
         }
     }

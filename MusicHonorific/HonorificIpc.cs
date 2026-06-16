@@ -1,6 +1,7 @@
 using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using System;
+using System.Collections.Generic;
 using System.Text.Json;
 
 namespace MusicHonorific;
@@ -25,8 +26,9 @@ public sealed class HonorificIpc
     /// <summary>Sets the local player's Honorific title to the given text.</summary>
     /// <param name="title">Title text.</param>
     /// <param name="isPrefix">Whether the title appears before the name.</param>
-    /// <param name="glow">Optional RGB glow color in 0–1 range.</param>
-    public void SetTitle(string title, bool isPrefix = false, (float R, float G, float B)? glow = null)
+    /// <param name="color">Optional RGB text color in 0-1 range.</param>
+    /// <param name="glow">Optional RGB glow color in 0-1 range.</param>
+    public void SetTitle(string title, bool isPrefix = false, (float R, float G, float B)? color = null, (float R, float G, float B)? glow = null)
     {
         if (string.IsNullOrWhiteSpace(title)) return;
 
@@ -35,21 +37,22 @@ public sealed class HonorificIpc
 
         try
         {
-            string payload;
+            var payloadObj = new Dictionary<string, object>
+            {
+                ["Title"] = title,
+                ["IsPrefix"] = isPrefix,
+            };
+            if (color.HasValue)
+            {
+                var c = color.Value;
+                payloadObj["Color"] = new { X = c.R, Y = c.G, Z = c.B };
+            }
             if (glow.HasValue)
             {
                 var g = glow.Value;
-                payload = JsonSerializer.Serialize(new
-                {
-                    Title = title,
-                    IsPrefix = isPrefix,
-                    Glow = new { X = g.R, Y = g.G, Z = g.B }
-                });
+                payloadObj["Glow"] = new { X = g.R, Y = g.G, Z = g.B };
             }
-            else
-            {
-                payload = JsonSerializer.Serialize(new { Title = title, IsPrefix = isPrefix });
-            }
+            var payload = JsonSerializer.Serialize(payloadObj);
             setTitle.InvokeAction(0, payload);
         }
         catch (Exception ex)

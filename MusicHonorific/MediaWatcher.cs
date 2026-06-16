@@ -46,7 +46,7 @@ public sealed class MediaWatcher : IDisposable
 
     public MediaWatcher()
     {
-        timer = new System.Timers.Timer(3000);
+        timer = new System.Timers.Timer(5000);
         timer.Elapsed += OnTick;
         timer.AutoReset = true;
         timer.Start();
@@ -66,7 +66,7 @@ public sealed class MediaWatcher : IDisposable
         {
             var output = await RunQueryAsync();
             ParseOutput(output);
-        }        catch (Exception ex)
+        } catch (Exception ex)
         {
             Plugin.Log.Warning($"[MediaSessionWatcher] {ex}");
             LastError = ex.Message;
@@ -91,6 +91,8 @@ public sealed class MediaWatcher : IDisposable
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8,
         };
 
         // Pass the source toggles to the out-of-process query.
@@ -194,6 +196,10 @@ public sealed class MediaWatcher : IDisposable
     /// </summary>
     private const string QueryScript = @"
 $ErrorActionPreference = 'Stop'
+# Emit UTF-8 so non-Latin titles (Cyrillic, Japanese, ...) survive the pipe instead of
+# being replaced with '?' by the default console codepage.
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 try {
     Add-Type -AssemblyName System.Runtime.WindowsRuntime | Out-Null
 

@@ -86,8 +86,8 @@ public sealed class Plugin : IDalamudPlugin
 
         if (!Configuration.EnableHonorificSync) return;
 
-        var currentSong = MediaWatcher.Song;
-        var currentArtist = MediaWatcher.Artist;
+        var currentSong = TextSanitizer.Sanitize(MediaWatcher.Song);
+        var currentArtist = TextSanitizer.Sanitize(MediaWatcher.Artist);
 
         if (string.IsNullOrEmpty(currentSong) || !MediaWatcher.IsPlaying)
         {
@@ -121,10 +121,18 @@ public sealed class Plugin : IDalamudPlugin
             titleText = BuildHonorificTitle(currentSong, currentArtist, elapsed);
         }
 
-        if (titleText == lastHonorificTitle) return;
+        var textColor = Configuration.TextColor;
+        var glowColor = Configuration.GlowColor;
+//
+        // Cache on title + colors so a color change is pushed even when the text is unchanged.
+        var stateKey = $"{titleText}|{textColor}|{glowColor}";
+        if (stateKey == lastHonorificTitle) return;
 
-        lastHonorificTitle = titleText;
-        HonorificIpc.SetTitle(titleText, glow: (0.635f, 0.220f, 1.0f)); // Accent purple #A238FF
+        lastHonorificTitle = stateKey;
+        HonorificIpc.SetTitle(
+            titleText,
+            color: (textColor.X, textColor.Y, textColor.Z),
+            glow: (glowColor.X, glowColor.Y, glowColor.Z));
     }
 
     /// <summary>

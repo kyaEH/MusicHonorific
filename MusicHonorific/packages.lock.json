@@ -2,6 +2,12 @@
   "version": 1,
   "dependencies": {
     "net10.0-windows10.0.19041": {
+      "AnyAscii": {
+        "type": "Direct",
+        "requested": "[0.3.2, )",
+        "resolved": "0.3.2",
+        "contentHash": "kl1u4+p5Kv+2XG94R8tSjJOk0kwMZCGgaR8XrWMzZOwNX/y+ZApDB8hgAWSQj/hBxQ4sdkTFkgc+bT9CVn289g=="
+      },
       "DalamudPackager": {
         "type": "Direct",
         "requested": "[15.0.0, )",
