@@ -9,7 +9,7 @@
   "Tags": ["music", "honorific", "deezer", "spotify"],
   "CategoryTags": ["other"],
   "LoadRequiredState": 0,
-  "DownloadLinkInstall": "https://github.com/KyaEH/MusicHonorific/releases/download/Beta/latest.zip",
-  "DownloadLinkUpdate": "https://github.com/KyaEH/MusicHonorific/releases/download/Beta/latest.zip",
+  "DownloadLinkInstall": "https://github.com/KyaEH/MusicHonorific/releases/download/0.0.0.1/latest.zip",
+  "DownloadLinkUpdate": "https://github.com/KyaEH/MusicHonorific/releases/download/0.0.0.1/latest.zip",
   "LoadSync": false
 }
