@@ -113,7 +113,7 @@ public sealed class Plugin : IDalamudPlugin
         }
         else
         {
-            titleText = BuildHonorificTitle(currentSong, currentArtist);
+            titleText = BuildHonorificTitle(currentSong, currentArtist, elapsed);
         }
 
         if (titleText == lastHonorificTitle) return;
@@ -136,47 +136,49 @@ public sealed class Plugin : IDalamudPlugin
         return "\u266a Listening to music \u266a";
     }
 
+    // Marquee tuning.
+    private const string TitlePrefix = "♪ ";
+    private const string TitleSuffix = " ♪";
+    private const string TitleSeparator = " - ";
+    private const int TitleMaxLen = 32;
+    private const double ScrollStepSeconds = 0.3;  // time per one-character advance
+    private const double ScrollPauseSeconds = 5; // hold at the start and the end before looping
+
     /// <summary>
-    /// Builds the Honorific title string:
-    /// ♪ Song  (if song alone fits in 32 chars)
-    /// ♪ Song - Ar...  (artist truncated with "..." if space remains)
+    /// Builds the Honorific title string. The ♪ prefix and suffix stay fixed while the
+    /// "Artist - Song" text scrolls (marquee) one character at a time when it is too long
+    /// to fit in 32 characters, pausing at the start and end before looping.
     /// </summary>
-    private static string BuildHonorificTitle(string song, string artist)
+    private static string BuildHonorificTitle(string song, string artist, double timeSeconds)
     {
         if (string.IsNullOrEmpty(song)) return string.Empty;
 
-        const string prefix = "♪ ";
-        const string suffix = " ♪";
-        const string separator = " - ";
-        const int maxLen = 32;
+        var content = string.IsNullOrEmpty(artist) ? song : artist + TitleSeparator + song;
 
-        // Full ideal: ♪ Artist - Song ♪
-        var full = prefix + (string.IsNullOrEmpty(artist) ? song : artist + separator + song) + suffix;
-        if (full.Length <= maxLen) return full;
+        // Whole thing fits — show it static.
+        var full = TitlePrefix + content + TitleSuffix;
+        if (full.Length <= TitleMaxLen) return full;
 
-        if (string.IsNullOrEmpty(artist))
-        {
-            // No artist, truncate song and append suffix
-            var available = maxLen - prefix.Length - suffix.Length;
-            return prefix + (song.Length <= available ? song : song[..available].TrimEnd()) + suffix;
-        }
+        // Otherwise scroll the content through a fixed-width window between the notes.
+        var window = TitleMaxLen - TitlePrefix.Length - TitleSuffix.Length;
+        var maxOffset = content.Length - window; // last valid start index
 
-        // Try: ♪ Artist... - Song ♪ (truncate artist to make room for full song + suffix)
-        var songSection = separator + song + suffix;
-        var artistAvailable = maxLen - prefix.Length - songSection.Length;
-        if (artistAvailable >= 4) // room for at least "A..."
-        {
-            var truncatedArtist = artist.Length <= artistAvailable
-                ? artist
-                : artist[..(artistAvailable - 3)].TrimEnd() + "...";
-            return prefix + truncatedArtist + songSection;
-        }
+        var scrollDuration = maxOffset * ScrollStepSeconds;
+        var totalDuration = ScrollPauseSeconds + scrollDuration + ScrollPauseSeconds;
+        var t = timeSeconds % totalDuration;
 
-        // Song + suffix alone — truncate song if needed
-        var songOnly = prefix + song + suffix;
-        if (songOnly.Length <= maxLen) return songOnly;
-        var songAvail = maxLen - prefix.Length - suffix.Length;
-        return prefix + song[..songAvail].TrimEnd() + suffix;
+        int offset;
+        if (t < ScrollPauseSeconds)
+            offset = 0; // hold at the beginning
+        else if (t < ScrollPauseSeconds + scrollDuration)
+            offset = (int)((t - ScrollPauseSeconds) / ScrollStepSeconds); // sliding
+        else
+            offset = maxOffset; // hold at the end
+
+        if (offset < 0) offset = 0;
+        if (offset > maxOffset) offset = maxOffset;
+
+        return TitlePrefix + content.Substring(offset, window) + TitleSuffix;
     }
 
     private void OnCommand(string command, string args)
