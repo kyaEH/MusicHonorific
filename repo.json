@@ -20,9 +20,9 @@
   "LoadSync": false,
   "CanUnloadAsync": false,
   "LoadPriority": 0,
-  "IconUrl": "https://raw.githubusercontent.com/kyaEH/MusicHonorific/refs/heads/master/Data/cat.png",
+  "IconUrl": "https://raw.githubusercontent.com/KyaEH/MusicHonorific/master/Data/cat.png",
   "Punchline": "Display your currently playing track as your Honorific title.",
-  "DownloadLinkInstall": "https://github.com/kyaEH/MusicHonorific/archive/refs/tags/Beta.zip",
-  "DownloadLinkUpdate": "https://github.com/kyaEH/MusicHonorific/archive/refs/tags/Beta.zip",
+  "DownloadLinkInstall": "https://github.com/KyaEH/MusicHonorific/releases/download/Beta/latest.zip",
+  "DownloadLinkUpdate": "https://github.com/KyaEH/MusicHonorific/releases/download/Beta/latest.zip",
   "AcceptsFeedback": true
 }
