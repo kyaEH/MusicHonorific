@@ -1,4 +1,5 @@
-{
+[
+  {
   "Author": "Kyaeh / Pastalix / Lianh Procyon",
   "Name": "Music Honorific",
   "InternalName": "MusicHonorific",
@@ -25,4 +26,5 @@
   "DownloadLinkInstall": "https://github.com/KyaEH/MusicHonorific/releases/download/Beta/latest.zip",
   "DownloadLinkUpdate": "https://github.com/KyaEH/MusicHonorific/releases/download/Beta/latest.zip",
   "AcceptsFeedback": true
-}
+  }
+]
