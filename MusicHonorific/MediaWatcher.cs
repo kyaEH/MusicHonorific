@@ -18,6 +18,14 @@ public sealed class MediaWatcher : IDisposable
     private readonly System.Timers.Timer timer;
     private readonly SemaphoreSlim refreshLock = new(1, 1);
 
+    /// <summary>
+    /// Source toggles read just before each query. When a category is disabled, its sessions
+    /// are skipped entirely so a disabled source cannot block an enabled one that is also playing.
+    /// </summary>
+    public bool AllowDeezer { get; set; } = true;
+    public bool AllowSpotify { get; set; } = true;
+    public bool AllowOther { get; set; } = true;
+
     /// <summary>Raw title representation for display/debug.</summary>
     public string RawTitle { get; private set; } = string.Empty;
 
@@ -58,8 +66,7 @@ public sealed class MediaWatcher : IDisposable
         {
             var output = await RunQueryAsync();
             ParseOutput(output);
-        }
-        catch (Exception ex)
+        }        catch (Exception ex)
         {
             Plugin.Log.Warning($"[MediaSessionWatcher] {ex}");
             LastError = ex.Message;
@@ -72,7 +79,7 @@ public sealed class MediaWatcher : IDisposable
         }
     }
 
-    private static async Task<string> RunQueryAsync()
+    private async Task<string> RunQueryAsync()
     {
         var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(QueryScript));
 
@@ -85,6 +92,11 @@ public sealed class MediaWatcher : IDisposable
             UseShellExecute = false,
             CreateNoWindow = true,
         };
+
+        // Pass the source toggles to the out-of-process query.
+        psi.EnvironmentVariables["MH_ALLOW_DEEZER"] = AllowDeezer ? "1" : "0";
+        psi.EnvironmentVariables["MH_ALLOW_SPOTIFY"] = AllowSpotify ? "1" : "0";
+        psi.EnvironmentVariables["MH_ALLOW_OTHER"] = AllowOther ? "1" : "0";
 
         using var process = new Process { StartInfo = psi };
         process.Start();
@@ -212,6 +224,21 @@ try {
         return 3
     }
 
+    function Test-SourceAllowed($id) {
+        $low = if ($id) { $id.ToLower() } else { '' }
+        if ($low.Contains('deezer')) { return $env:MH_ALLOW_DEEZER -ne '0' }
+        if ($low.Contains('spotify')) { return $env:MH_ALLOW_SPOTIFY -ne '0' }
+        return $env:MH_ALLOW_OTHER -ne '0'
+    }
+
+    # Drop sessions whose source category has been disabled in the plugin config.
+    $sessions = @($sessions | Where-Object { Test-SourceAllowed $_.SourceAppUserModelId })
+
+    if ($sessions.Count -eq 0) {
+        Write-Output ""NONE`t`t`t""
+        exit 0
+    }
+
     # Prefer a session that is currently playing; tie-break by known source priority
     # (Deezer desktop > Deezer RPC > Spotify > browsers/YouTube/other).
     $playing = @($sessions | Where-Object { $_.GetPlaybackInfo().PlaybackStatus -eq 'Playing' })
@@ -219,7 +246,7 @@ try {
     $best = $pool | Sort-Object { Get-SourcePriority $_.SourceAppUserModelId } | Select-Object -First 1
     if (-not $best) { $best = $mgr.GetCurrentSession() }
 
-    if (-not $best) {
+    if (-not $best -or -not (Test-SourceAllowed $best.SourceAppUserModelId)) {
         Write-Output ""NONE`t`t`t""
         exit 0
     }

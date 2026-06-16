@@ -77,20 +77,6 @@ public class MainWindow : Window, IDisposable
         }
 
         ImGui.Spacing();
-
-        // Honorific sync toggle
-        var syncEnabled = plugin.Configuration.EnableHonorificSync;
-        if (ImGui.Checkbox("Sync song to Honorific title", ref syncEnabled))
-        {
-            plugin.Configuration.EnableHonorificSync = syncEnabled;
-            plugin.Configuration.Save();
-            if (!syncEnabled)
-                plugin.HonorificIpc.ClearTitle();
-        }
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Requires the Honorific plugin to be installed and enabled.");
-
-        ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
 

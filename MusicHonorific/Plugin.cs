@@ -79,6 +79,11 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnFrameworkUpdate(IFramework framework)
     {
+        // Keep the watcher's source filter in sync with the config.
+        MediaWatcher.AllowDeezer = Configuration.AllowDeezer;
+        MediaWatcher.AllowSpotify = Configuration.AllowSpotify;
+        MediaWatcher.AllowOther = Configuration.AllowOther;
+
         if (!Configuration.EnableHonorificSync) return;
 
         var currentSong = MediaWatcher.Song;
