@@ -1,0 +1,11 @@
+{
+    "files.exclude": {
+        "**/*.rpyc": true,
+        "**/*.rpa": true,
+        "**/*.rpymc": true,
+        "**/cache/": true
+    },
+    "chat.tools.terminal.autoApprove": {
+        "dotnet build": true
+    }
+}
