@@ -99,11 +99,22 @@ public sealed class Plugin : IDalamudPlugin
         // Song is playing — start cycle timer on first song
         syncCycleStart ??= DateTime.UtcNow;
 
-        // 60-second cycle: 0–49s = normal title, 50–59s = source branding
-        var secsInCycle = (DateTime.UtcNow - syncCycleStart.Value).TotalSeconds % 60.0;
-        var titleText = secsInCycle >= 50.0
-            ? BuildBrandingTitle(MediaWatcher.SourceAppId)
-            : BuildHonorificTitle(currentSong, currentArtist);
+        // 60-second cycle: 0–49s = normal title, 50–59s = branding.
+        // The branding alternates each cycle between the source message and the plugin promo.
+        var elapsed = (DateTime.UtcNow - syncCycleStart.Value).TotalSeconds;
+        var secsInCycle = elapsed % 60.0;
+        var cycleIndex = (long)(elapsed / 60.0);
+        string titleText;
+        if (secsInCycle >= 50.0)
+        {
+            titleText = cycleIndex % 2 == 0
+                ? BuildBrandingTitle(MediaWatcher.SourceAppId)
+                : "\u266a Synced via MusicHonorific \u266a";
+        }
+        else
+        {
+            titleText = BuildHonorificTitle(currentSong, currentArtist);
+        }
 
         if (titleText == lastHonorificTitle) return;
 
