@@ -4,10 +4,10 @@
   "Punchline": "Display your currently playing track as your Honorific title.",
   "Description": "Syncs the song playing on Deezer, Spotify or your browser to your in-game Honorific title. Requires the Honorific plugin.",
   "ApplicableVersion": "any",
-  "Tags": [
-    "music",
-    "honorific",
-    "deezer",
-    "spotify"
-  ]
+  "RepoUrl": "https://github.com/KyaEH/MusicHonorific",
+  "IconUrl": "https://raw.githubusercontent.com/kyaEH/MusicHonorific/refs/heads/master/Data/cat.png",
+  "Tags": ["music", "honorific", "deezer", "spotify"],
+  "CategoryTags": ["other"],
+  "LoadRequiredState": 0,
+  "LoadSync": false
 }
