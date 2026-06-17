@@ -61,7 +61,7 @@ Maximum title length is **32 characters** (Honorific limit).
 ## Credits
 
 - **Author** — Kyaeh / Pastalix / Lianh Procyon
-- **Inspired by** — [SpotifyHonorific](https://github.com/Valiice/SpotifyHonorific) by Valiice and [PatMeHonorific](https://github.com/anya-hichu/PatMeHonorific) by anya-hichu
+- **Inspired by** — [SpotifyHonorific](https://github.com/Valiice/SpotifyHonorific) by Valiice, [NowPlaying](https://github.com/wompscode/NowPlaying/) by Phoebe, and [PatMeHonorific](https://github.com/anya-hichu/PatMeHonorific) by anya-hichu
 - **Built from** — [SamplePlugin](https://github.com/goatcorp/SamplePlugin) by goatcorp
 - **Media API** — Windows GlobalSystemMediaTransportControlsSessionManager
 

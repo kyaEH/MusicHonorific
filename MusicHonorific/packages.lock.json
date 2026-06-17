@@ -2,12 +2,6 @@
   "version": 1,
   "dependencies": {
     "net10.0-windows10.0.19041": {
-      "AnyAscii": {
-        "type": "Direct",
-        "requested": "[0.3.2, )",
-        "resolved": "0.3.2",
-        "contentHash": "kl1u4+p5Kv+2XG94R8tSjJOk0kwMZCGgaR8XrWMzZOwNX/y+ZApDB8hgAWSQj/hBxQ4sdkTFkgc+bT9CVn289g=="
-      },
       "DalamudPackager": {
         "type": "Direct",
         "requested": "[15.0.0, )",
@@ -19,6 +13,12 @@
         "requested": "[1.2.39, )",
         "resolved": "1.2.39",
         "contentHash": "fcFN01tDTIQqDuTwr1jUQK/geofiwjG5DycJQOnC72i1SsLAk1ELe+apBOuZ11UMQG8YKFZG1FgvjZPbqHyatg=="
+      },
+      "NPSMLib": {
+        "type": "Direct",
+        "requested": "[0.9.14, )",
+        "resolved": "0.9.14",
+        "contentHash": "E2sS3CayxUEDHP1WH97XrH/ipvg+JQ9SSeUgstF4pTqh2peBh5UH0PAV+44prHqm9pRPwfsab8Sgc8AbKGTCBw=="
       }
     }
   }

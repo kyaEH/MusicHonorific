@@ -1,22 +1,31 @@
 using System;
-using System.Diagnostics;
-using System.Text;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
+using Dalamud.Utility;
+using NPSMLib;
 
 namespace MusicHonorific;
 
 /// <summary>
-/// Watches the Windows "Now Playing" media session (GlobalSystemMediaTransportControls).
-/// The query runs out-of-process via PowerShell to avoid the CsWinRT global ComWrappers
-/// registration conflict ("Attempt to update previously set global instance") that occurs
-/// when calling WinRT projections in-process inside the Dalamud host.
+/// Watches the Windows "Now Playing" media session via NPSMLib, an in-process COM wrapper
+/// around the NowPlayingSessionManager API (the same data the WinRT
+/// GlobalSystemMediaTransportControls projection exposes). NPSMLib talks to the COM server
+/// directly, so it avoids the CsWinRT global ComWrappers conflict ("Attempt to update
+/// previously set global instance") that prevented calling the WinRT projection in-process
+/// and previously forced an out-of-process PowerShell bridge.
 /// </summary>
 public sealed class MediaWatcher : IDisposable
 {
     private readonly System.Timers.Timer timer;
-    private readonly SemaphoreSlim refreshLock = new(1, 1);
+    private readonly object queryLock = new();
+
+    // Created lazily on a thread-pool (MTA) thread so the COM object and every call that
+    // touches it share a single apartment.
+    private NowPlayingSessionManager? sessionManager;
+    private bool initFailed;
 
     /// <summary>
     /// Source toggles read just before each query. When a category is disabled, its sessions
@@ -26,9 +35,6 @@ public sealed class MediaWatcher : IDisposable
     public bool AllowSpotify { get; set; } = true;
     public bool AllowOther { get; set; } = true;
 
-    /// <summary>Raw title representation for display/debug.</summary>
-    public string RawTitle { get; private set; } = string.Empty;
-
     /// <summary>Parsed song title. Empty if nothing is playing.</summary>
     public string Song { get; private set; } = string.Empty;
 
@@ -36,8 +42,8 @@ public sealed class MediaWatcher : IDisposable
     public string Artist { get; private set; } = string.Empty;
 
     /// <summary>True when a matching media session is found.</summary>
-    public bool IsRunning { get; private set; } = false;
-    public bool IsPlaying { get; private set; } = false;
+    public bool IsRunning { get; private set; }
+    public bool IsPlaying { get; private set; }
     public string SourceAppId { get; private set; } = string.Empty;
     public string LastError { get; private set; } = string.Empty;
 
@@ -50,134 +56,158 @@ public sealed class MediaWatcher : IDisposable
         timer.Elapsed += OnTick;
         timer.AutoReset = true;
         timer.Start();
-        _ = RefreshAsync();
+        Refresh();
     }
 
     /// <summary>Force an immediate refresh outside of the timer interval.</summary>
-    public void Refresh() => _ = RefreshAsync();
+    /// <remarks>
+    /// Dispatched onto the thread pool so the COM object is always created and used from an
+    /// MTA thread, even when this is called from the game's main thread (e.g. the UI button).
+    /// </remarks>
+    public void Refresh() => Task.Run(RunQuery);
 
-    private void OnTick(object? sender, ElapsedEventArgs e) => _ = RefreshAsync();
+    // Timer callbacks already run on an MTA thread-pool thread.
+    private void OnTick(object? sender, ElapsedEventArgs e) => RunQuery();
 
-    private async Task RefreshAsync()
+    private void RunQuery()
     {
-        if (!await refreshLock.WaitAsync(0)) return;
-
+        // Skip if a query is already in flight rather than queueing another up.
+        if (!Monitor.TryEnter(queryLock)) return;
         try
         {
-            var output = await RunQueryAsync();
-            ParseOutput(output);
-        } catch (Exception ex)
+            Query();
+        }
+        catch (Exception ex)
         {
-            Plugin.Log.Warning($"[MediaSessionWatcher] {ex}");
+            Plugin.Log.Warning($"[MediaWatcher] {ex}");
             LastError = ex.Message;
             Diagnostics = $"Exception: {ex.GetType().Name}: {ex.Message}";
             ResetState();
         }
         finally
         {
-            refreshLock.Release();
+            Monitor.Exit(queryLock);
         }
     }
 
-    private async Task<string> RunQueryAsync()
+    private void Query()
     {
-        var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(QueryScript));
+        if (initFailed) return;
 
-        var psi = new ProcessStartInfo
+        if (Util.IsWine())
         {
-            FileName = "powershell.exe",
-            Arguments = $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encoded}",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8,
-        };
-
-        // Pass the source toggles to the out-of-process query.
-        psi.EnvironmentVariables["MH_ALLOW_DEEZER"] = AllowDeezer ? "1" : "0";
-        psi.EnvironmentVariables["MH_ALLOW_SPOTIFY"] = AllowSpotify ? "1" : "0";
-        psi.EnvironmentVariables["MH_ALLOW_OTHER"] = AllowOther ? "1" : "0";
-
-        using var process = new Process { StartInfo = psi };
-        process.Start();
-
-        var stdoutTask = process.StandardOutput.ReadToEndAsync();
-        var stderrTask = process.StandardError.ReadToEndAsync();
-
-        if (!await Task.Run(() => process.WaitForExit(8000)))
-        {
-            try { process.Kill(); } catch { /* ignore */ }
-            return "ERR\tPowerShell query timed out.";
+            ResetState();
+            LastError = "The Windows media API is unavailable under Wine/Linux.";
+            Diagnostics = LastError;
+            return;
         }
 
-        var stdout = (await stdoutTask).Trim();
-        if (string.IsNullOrWhiteSpace(stdout))
+        NowPlayingSessionManager mgr;
+        try
         {
-            var stderr = (await stderrTask).Trim();
-            return string.IsNullOrWhiteSpace(stderr) ? "NONE\t\t\t" : $"ERR\t{stderr}";
+            mgr = sessionManager ??= new NowPlayingSessionManager();
+        }
+        catch (Exception ex)
+        {
+            initFailed = true; // unsupported OS / COM unavailable — stop retrying every tick
+            ResetState();
+            LastError = ex.Message;
+            Diagnostics = $"Failed to create NowPlayingSessionManager: {ex.Message}";
+            return;
         }
 
-        return stdout;
-    }
-
-    private void ParseOutput(string output)
-    {
-        // Use the last non-empty line in case the host emitted extra noise.
-        var lines = output.Split('\n');
-        var line = string.Empty;
-        for (var i = lines.Length - 1; i >= 0; i--)
+        var sessions = mgr.GetSessions();
+        if (sessions == null || sessions.Length == 0)
         {
-            var candidate = lines[i].Trim('\r', ' ');
-            if (!string.IsNullOrWhiteSpace(candidate))
+            ResetState();
+            LastError = string.Empty;
+            Diagnostics = "No active media session found.";
+            return;
+        }
+
+        // Evaluate each allowed session, capturing its data source and playback state.
+        var candidates = new List<Candidate>();
+        foreach (var session in sessions)
+        {
+            string sourceId;
+            try { sourceId = session.SourceAppId ?? string.Empty; }
+            catch { continue; }
+
+            if (!IsSourceAllowed(sourceId)) continue;
+
+            try
             {
-                line = candidate;
-                break;
+                var src = session.ActivateMediaPlaybackDataSource();
+                var playing = src.GetMediaPlaybackInfo().PlaybackState == MediaPlaybackState.Playing;
+                candidates.Add(new Candidate(src, sourceId, playing, GetSourcePriority(sourceId)));
+            }
+            catch
+            {
+                // Session went away or refused activation between enumeration and read — skip it.
             }
         }
 
-        var parts = line.Split('\t');
-        var tag = parts.Length > 0 ? parts[0] : string.Empty;
-
-        switch (tag)
+        if (candidates.Count == 0)
         {
-            case "OK":
-                Song = (parts.Length > 1 ? parts[1] : string.Empty).Trim();
-                Artist = (parts.Length > 2 ? parts[2] : string.Empty).Trim();
-                var status = (parts.Length > 3 ? parts[3] : string.Empty).Trim();
-                SourceAppId = (parts.Length > 4 ? parts[4] : string.Empty).Trim();
-
-                IsPlaying = status.Equals("Playing", StringComparison.OrdinalIgnoreCase);
-                IsRunning = true;
-                RawTitle = string.IsNullOrWhiteSpace(Artist) ? Song : $"{Artist} - {Song}";
-                LastError = string.Empty;
-                Diagnostics = $"OK source=[{SourceAppId}] status={status}";
-                break;
-
-            case "NONE":
-                ResetState();
-                Diagnostics = "No active media session found.";
-                break;
-
-            case "ERR":
-                ResetState();
-                LastError = parts.Length > 1 ? parts[1] : "Unknown error.";
-                Diagnostics = $"Query error: {LastError}";
-                break;
-
-            default:
-                ResetState();
-                Diagnostics = $"Unexpected query output: {line}";
-                break;
+            ResetState();
+            LastError = string.Empty;
+            Diagnostics = "No active media session found.";
+            return;
         }
+
+        // Prefer a session that is currently playing; tie-break by known source priority
+        // (Deezer desktop > Deezer RPC > Spotify > browsers/YouTube/other).
+        var playingOnly = candidates.Where(c => c.IsPlaying).ToList();
+        var pool = playingOnly.Count > 0 ? playingOnly : candidates;
+        var best = pool.OrderBy(c => c.Priority).First();
+
+        MediaObjectInfo info;
+        try
+        {
+            info = best.Source.GetMediaObjectInfo();
+        }
+        catch (Exception ex)
+        {
+            ResetState();
+            LastError = ex.Message;
+            Diagnostics = $"Failed to read media info: {ex.Message}";
+            return;
+        }
+
+        Song = (info.Title ?? string.Empty).Trim();
+        Artist = (info.Artist ?? string.Empty).Trim();
+        SourceAppId = best.SourceId;
+        IsPlaying = best.IsPlaying;
+        IsRunning = true;
+        LastError = string.Empty;
+        Diagnostics = $"OK source=[{SourceAppId}] status={(IsPlaying ? "Playing" : "Paused")}";
+    }
+
+    /// <summary>True when the given source's category is enabled in the config.</summary>
+    private bool IsSourceAllowed(string sourceId)
+    {
+        var low = sourceId.ToLowerInvariant();
+        if (low.Contains("deezer")) return AllowDeezer;
+        if (low.Contains("spotify")) return AllowSpotify;
+        return AllowOther;
+    }
+
+    /// <summary>
+    /// Lower numbers win: Deezer desktop, then Deezer RPC, then Spotify, then everything else.
+    /// </summary>
+    private static int GetSourcePriority(string sourceId)
+    {
+        var low = sourceId.ToLowerInvariant();
+        if (low.Contains("deezer-desktop")) return 0;
+        if (low.Contains("deezer")) return 1;
+        if (low.Contains("spotify")) return 2;
+        return 3;
     }
 
     private void ResetState()
     {
         IsRunning = false;
         IsPlaying = false;
-        RawTitle = string.Empty;
         Song = string.Empty;
         Artist = string.Empty;
         SourceAppId = string.Empty;
@@ -187,86 +217,9 @@ public sealed class MediaWatcher : IDisposable
     {
         timer.Stop();
         timer.Dispose();
-        refreshLock.Dispose();
     }
 
-    /// <summary>
-    /// PowerShell script that queries the Windows media session API and prints a
-    /// tab-separated result: "OK\t{title}\t{artist}\t{status}\t{source}".
-    /// </summary>
-    private const string QueryScript = @"
-$ErrorActionPreference = 'Stop'
-# Emit UTF-8 so non-Latin titles (Cyrillic, Japanese, ...) survive the pipe instead of
-# being replaced with '?' by the default console codepage.
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-try {
-    Add-Type -AssemblyName System.Runtime.WindowsRuntime | Out-Null
-
-    $asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() |
-        Where-Object {
-            $_.Name -eq 'AsTask' -and
-            $_.GetParameters().Count -eq 1 -and
-            $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1'
-        })[0]
-
-    function Await($op, $resultType) {
-        $task = $asTaskGeneric.MakeGenericMethod($resultType).Invoke($null, @($op))
-        $task.Wait(-1) | Out-Null
-        $task.Result
-    }
-
-    [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime] | Out-Null
-
-    $mgr = Await ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
-    $sessions = @($mgr.GetSessions())
-
-    function Get-SourcePriority($id) {
-        if (-not $id) { return 99 }
-        $low = $id.ToLower()
-        if ($low.Contains('deezer-desktop')) { return 0 }
-        if ($low.Contains('deezer')) { return 1 }
-        if ($low.Contains('spotify')) { return 2 }
-        return 3
-    }
-
-    function Test-SourceAllowed($id) {
-        $low = if ($id) { $id.ToLower() } else { '' }
-        if ($low.Contains('deezer')) { return $env:MH_ALLOW_DEEZER -ne '0' }
-        if ($low.Contains('spotify')) { return $env:MH_ALLOW_SPOTIFY -ne '0' }
-        return $env:MH_ALLOW_OTHER -ne '0'
-    }
-
-    # Drop sessions whose source category has been disabled in the plugin config.
-    $sessions = @($sessions | Where-Object { Test-SourceAllowed $_.SourceAppUserModelId })
-
-    if ($sessions.Count -eq 0) {
-        Write-Output ""NONE`t`t`t""
-        exit 0
-    }
-
-    # Prefer a session that is currently playing; tie-break by known source priority
-    # (Deezer desktop > Deezer RPC > Spotify > browsers/YouTube/other).
-    $playing = @($sessions | Where-Object { $_.GetPlaybackInfo().PlaybackStatus -eq 'Playing' })
-    $pool = if ($playing.Count -gt 0) { $playing } else { $sessions }
-    $best = $pool | Sort-Object { Get-SourcePriority $_.SourceAppUserModelId } | Select-Object -First 1
-    if (-not $best) { $best = $mgr.GetCurrentSession() }
-
-    if (-not $best -or -not (Test-SourceAllowed $best.SourceAppUserModelId)) {
-        Write-Output ""NONE`t`t`t""
-        exit 0
-    }
-
-    $media = Await ($best.TryGetMediaPropertiesAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties])
-    $status = $best.GetPlaybackInfo().PlaybackStatus
-    $title = if ($media) { $media.Title } else { '' }
-    $artist = if ($media) { $media.Artist } else { '' }
-    $source = $best.SourceAppUserModelId
-
-    Write-Output (""OK`t{0}`t{1}`t{2}`t{3}"" -f $title, $artist, $status, $source)
-}
-catch {
-    Write-Output (""ERR`t{0}"" -f $_.Exception.Message)
-}
-";
+    /// <summary>A single allowed media session captured during a query, with its playback state.</summary>
+    private readonly record struct Candidate(
+        MediaPlaybackDataSource Source, string SourceId, bool IsPlaying, int Priority);
 }

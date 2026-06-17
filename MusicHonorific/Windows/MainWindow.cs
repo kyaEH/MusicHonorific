@@ -93,6 +93,7 @@ public class MainWindow : Window, IDisposable
         ImGui.Indent();
         ImGui.TextDisabled("SpotifyHonorific  (Valiice)");
         ImGui.TextDisabled("PatMeHonorific  (anya-hichu)");
+        ImGui.TextDisabled("NowPlaying  (wompscode)");
         ImGui.Unindent();
 
         ImGui.Spacing();

@@ -86,8 +86,8 @@ public sealed class Plugin : IDalamudPlugin
 
         if (!Configuration.EnableHonorificSync) return;
 
-        var currentSong = TextSanitizer.Sanitize(MediaWatcher.Song);
-        var currentArtist = TextSanitizer.Sanitize(MediaWatcher.Artist);
+        var currentSong = MediaWatcher.Song;
+        var currentArtist = MediaWatcher.Artist;
 
         if (string.IsNullOrEmpty(currentSong) || !MediaWatcher.IsPlaying)
         {
@@ -123,7 +123,7 @@ public sealed class Plugin : IDalamudPlugin
 
         var textColor = Configuration.TextColor;
         var glowColor = Configuration.GlowColor;
-//
+
         // Cache on title + colors so a color change is pushed even when the text is unchanged.
         var stateKey = $"{titleText}|{textColor}|{glowColor}";
         if (stateKey == lastHonorificTitle) return;

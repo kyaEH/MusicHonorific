@@ -3,7 +3,7 @@
   "Author": "Kyaeh / Pastalix / Lianh Procyon",
   "Name": "Music Honorific",
   "InternalName": "MusicHonorific",
-  "AssemblyVersion": "0.0.0.5",
+  "AssemblyVersion": "0.0.1.0",
   "Description": "Syncs the song playing on Deezer, Spotify or your browser to your in-game Honorific title. Requires the Honorific plugin.",
   "ApplicableVersion": "any",
   "RepoUrl": "https://github.com/KyaEH/MusicHonorific",
